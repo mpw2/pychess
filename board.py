@@ -48,7 +48,6 @@ class Board:
                 if not turn is None and not self.color(i,j) == turn:
                     continue
                 moves = moves + self.legalMoves(i,j)
-                #moves.append(self.legalMoves(i,j))
         return moves
                 
 
@@ -65,29 +64,53 @@ class Board:
                 if i == 1 and not self.hasPiece(i+1,j) \
                      and not self.hasPiece(i+2,j):
                     moves.append(FILE_NAME[j]+str(i+1)+FILE_NAME[j]+str(i+3))
-                if self.hasPiece(i+1,j+1):
-                    if self.color(i+1,j+1) == BLACK:
-                        moves.append(FILE_NAME[j]+str(i+1)+"x"+FILE_NAME[j+1]+str(i+2))
-                if self.hasPiece(i+1,j-1):
-                    if self.color(i+1,j-1) == BLACK:
-                        moves.append(FILE_NAME[j]+str(i+1)+"x"+FILE_NAME[j-1]+str(i+2))
+                if self.hasPiece(i+1,j+1) and self.color(i+1,j+1) == BLACK:
+                    moves.append(FILE_NAME[j]+str(i+1)+"x"+FILE_NAME[j+1]+str(i+2))
+                if self.hasPiece(i+1,j-1) and self.color(i+1,j-1) == BLACK:
+                    moves.append(FILE_NAME[j]+str(i+1)+"x"+FILE_NAME[j-1]+str(i+2))
             else: # c == BLACK
                 if not self.hasPiece(i-1,j) and i > 0:
                     moves.append(FILE_NAME[j]+str(i+1)+FILE_NAME[j]+str(i))
                 if i == BOARD_SIZE-2 and not self.hasPiece(i-1,j) \
                      and not self.hasPiece(i-2,j):
                     moves.append(FILE_NAME[j]+str(i+1)+FILE_NAME[j]+str(i-1))
-                if self.hasPiece(i-1,j+1):
-                    if self.color(i-1,j+1) == WHITE:
-                        moves.append(FILE_NAME[j]+str(i+1)+"x"+FILE_NAME[j+1]+str(i))
-                if self.hasPiece(i-1,j-1):
-                    if self.color(i-1,j-1) == WHITE:
-                        moves.append(FILE_NAME[j]+str(i+1)+"x"+FILE_NAME[j-1]+str(i))
+                if self.hasPiece(i-1,j+1) and self.color(i-1,j+1) == WHITE:
+                    moves.append(FILE_NAME[j]+str(i+1)+"x"+FILE_NAME[j+1]+str(i))
+                if self.hasPiece(i-1,j-1) and self.color(i-1,j-1) == WHITE:
+                    moves.append(FILE_NAME[j]+str(i+1)+"x"+FILE_NAME[j-1]+str(i))
                     
         elif self.isPiece(s,KNIGHT):
-            pass
+            iOffset = [2,2,-2,-2,1,-1,1,-1]
+            jOffset = [1,-1,1,-1,2,2,-2,-2]
+            for io,jo in zip(iOffset,jOffset):
+                if not self.inBounds(i+io,j+jo):
+                    continue
+                if not self.hasPiece(i+io,j+jo):
+                    moves.append("N"+FILE_NAME[j]+str(i+1)+FILE_NAME[j+jo]+str(i+io+1))
+                elif self.color(i,j) != self.color(i+io,j+jo):
+                    moves.append("N"+FILE_NAME[j]+str(i+1)+"x"+FILE_NAME[j+jo]+str(i+io+1))
+
         elif self.isPiece(s,BISHOP):
-            pass
+            iOffset = [1,1,-1,-1]
+            jOffset = [1,-1,1,-1]
+            for io,jo in zip(iOffset,jOffset):
+                step = 1
+                while(step > 0):
+                    if not self.inBounds(i+io*step,j+jo*step):
+                        step = -1
+                        continue
+                    elif not self.hasPiece(i+io*step,j+jo*step):
+                        moves.append("B"+FILE_NAME[j]+str(i+1)+FILE_NAME[j+jo*step]+str(i+io*step+1))
+                        step += 1
+                        continue
+                    elif self.color(i,j) == self.color(i+io*step,j+jo*step):
+                        step = -1
+                        continue
+                    elif self.color(i,j) != self.color(i+io*step,j+jo*step):
+                        moves.append("B"+FILE_NAME[j]+str(i+1)+"x"+FILE_NAME[j+jo*step]+str(i+io*step+1))
+                        step = -1
+                        continue
+
         elif self.isPiece(s,ROOK):
             pass
         elif self.isPiece(s,QUEEN):
@@ -139,6 +162,24 @@ class Board:
             return False
         return ((a+1)%2) == b
 
+    def inBounds(self,i,j):
+        r = True
+        if (i < 0 or j < 0):
+            r = False
+        if (i >= BOARD_SIZE or j >= BOARD_SIZE):
+            r = False
+        return r
+
+    def idx2not(self,i,j):
+        fil = FILE_NAME[j]
+        rnk = i+1
+        return fil+str(rnk)
+
+    def not2idx(self,a1):
+        fil = FILE_NAME.index(a1[0])
+        rnk = int(a1[1])-1
+        return (rnk,fil)
+
     def __str__(self):
         out = ""
         row1 = ""
@@ -184,4 +225,15 @@ class Board:
     def __enter__(self):
         return self
 
+def main():
+    B = Board()
+    assert( B.idx2not(1,1) == "b2" )
+    assert( B.not2idx("a1") == (0,0) )
+    print( B.allLegalMoves() )
+    print( B.makeMove("e2e4") )
+    print( B.legalMoves(0,5) )
+    print( B.makeMove("Bf1c4") )
+    print( B.legalMoves(3,2) )
 
+if __name__ == "__main__":
+    main()
