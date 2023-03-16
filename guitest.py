@@ -58,6 +58,10 @@ def main():
 
     B = board.Board()
 
+    B.makeMove("e2e4")
+    B.makeMove("e7e5")
+    B.makeMove("Ke1e2")
+
     img = [[None for j in range(BOARD_SIZE)] for i in range(BOARD_SIZE)]
     for i in range(BOARD_SIZE):
         for j in range(BOARD_SIZE):

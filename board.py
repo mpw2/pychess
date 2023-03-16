@@ -5,19 +5,25 @@ class Board:
     
     def __init__(self,position=None):
         self.squares = [[0 for j in range(BOARD_SIZE)] for i in range(BOARD_SIZE)]
-        self.moveNum = 0
         self.setUpPieces(position)
         if not position is None:
+            self.moveNum = position.moveNum
             self.toMove = position.toMove
+            self.enPassantTarget = position.enPassantTarget
+            self.game_over = position.game_over
         else:
+            self.moveNum = 0
             self.toMove = WHITE
-        self.enPassantTarget = None
+            self.enPassantTarget = None
+            self.game_over = False
 
     def reset(self):
+        self.squares = [[0 for j in range(BOARD_SIZE)] for i in range(BOARD_SIZE)]
         self.moveNum = 0
         self.setUpPieces()
         self.toMove = WHITE
         self.enPassantTarget = None
+        self.game_over = False
 
     def setUpPieces(self,position=None):
         if position is None:
@@ -196,6 +202,7 @@ class Board:
         ij12 = [0,0,0,0]
         c = 0
         isPawn = True
+        isCapture = False
         isPromotion = False
         for s in notation:
             if isPromotion:
@@ -204,7 +211,7 @@ class Board:
             if s in "NBRQK":
                 isPawn = False
             elif s in "x":
-                pass
+                isCapture = True
             elif s in "=":
                 isPromotion = True
             elif s in FILE_NAME:
@@ -215,6 +222,11 @@ class Board:
                 c += 1
         if c < 4:
             return False
+
+        if isCapture:
+            captured_piece = self.squares[ij12[3]][ij12[2]]
+            if self.isPiece(captured_piece,KING):
+                self.game_over = True
 
         if not self.hasPiece(ij12[1],ij12[0]):
             return False
@@ -304,13 +316,14 @@ class Board:
         rnk = int(a1[1])-1
         return (rnk,fil)
 
-    def flatten(self,B):
+    def flatten(self):
         state = np.zeros(BOARD_SIZE*BOARD_SIZE)
         cnt = 0
         for i in range(BOARD_SIZE):
             for j in range(BOARD_SIZE):
-                state[cnt] = B.squares[i][j]
+                state[cnt] = self.squares[i][j]
                 cnt += 1
+        return state
 
     def __str__(self):
         out = ""
@@ -343,6 +356,7 @@ class Board:
                     out += "k"
                 else:
                     out += "."
+                out += " "
             out += "\n"
         return out
 

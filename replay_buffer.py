@@ -24,8 +24,8 @@ class ReplayBuffer:
     def sample(self, batch_size):
         samples = random.sample(self.buffer, batch_size)
         batch_samples = transition(*zip(*samples))
-        states = torch.cat(batch_samples.state)
-        next_states = torch.cat(batch_samples.next_state)
+        states = [*batch_samples.state]
+        next_states = [*batch_samples.next_state]
         actions = torch.cat(batch_samples.action)
         rewards = torch.cat(batch_samples.reward).flatten()
         dones = torch.cat(batch_samples.is_terminal).flatten()
