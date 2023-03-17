@@ -5,6 +5,7 @@ import random
 from constants import *
 from agent import Agent
 from human_agent import HumanAgent
+from random_agent import RandomAgent
 import config
 
 def main():
@@ -12,19 +13,36 @@ def main():
 
     B = board.Board()
 
+    starter = RandomAgent(B)
+
     player = HumanAgent(B)
 
     engine = Agent(B,config.config_simpleagent())
 
-    n = 0
-    last_to_move = None
+    legal_moves = B.allLegalMoves(B.toMove)
+    move = starter.choose_move(legal_moves)
+    B.makeMove(move)
+    legal_moves = B.allLegalMoves(B.toMove)
+    move = starter.choose_move(legal_moves)
+    B.makeMove(move)
+
+    n = 1
+    last_to_move = BLACK
     while(B.game_over == False):
         n += 1
         
-        move1 = None
         legal_moves = B.allLegalMoves(B.toMove)
-        move1 = engine.choose_move(legal_moves)
 
+        move = None
+        while(move is None):
+            move = player.choose_move()
+            if not move in legal_moves:
+                move = None
+                print("That is an illegal move")
+        
+        #move = engine.choose_move(legal_moves)
+
+        move1 = move
         B.makeMove(move1)
         last_to_move = WHITE
 
@@ -32,14 +50,18 @@ def main():
             print(f"{n}. {move1}")
             continue
 
-        move2 = None
         legal_moves = B.allLegalMoves(B.toMove)
-        while(move2 is None):
-            move2 = player.choose_move()
-            if not move2 in legal_moves:
-                move2 = None
-                print("That is an illegal move")
 
+        #move = None
+        #while(move is None):
+        #    move = player.choose_move()
+        #    if not move in legal_moves:
+        #        move = None
+        #        print("That is an illegal move")
+        
+        move = engine.choose_move(legal_moves)
+
+        move2 = move
         B.makeMove(move2)
         last_to_move = BLACK
 

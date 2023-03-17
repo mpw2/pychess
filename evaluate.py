@@ -9,7 +9,10 @@ def main():
 
     B = board.Board()
 
+    starter = RandomAgent(B)
+
     random_player = RandomAgent(B)
+    #random_player = Agent(B,config.config_simpleagent(train_iter=5))
 
     engine = Agent(B,config.config_simpleagent())
 
@@ -18,17 +21,19 @@ def main():
     max_moves = 100
    
     for t in range(n_games):
-        #print(f"Game {t+1} of {n_games}")   
+        if (t+1) % 10 == 0:
+            print(f"Game {t+1} of {n_games}")   
        
         B.reset()
+        last_to_move = None
 
         n = 0
         # make 2 random moves first
         legal_moves = B.allLegalMoves(B.toMove)
-        move = random_player.choose_move(legal_moves)
+        move = starter.choose_move(legal_moves)
         B.makeMove(move)
         legal_moves = B.allLegalMoves(B.toMove)
-        move = random_player.choose_move(legal_moves)
+        move = starter.choose_move(legal_moves)
         B.makeMove(move)
         n = 1
         while(B.game_over == False):
@@ -69,18 +74,21 @@ def main():
     win_record = [0,0,0]
     
     for t in range(n_games):
-        #print(f"Game {t+1} of {n_games}")   
+        if (t+1) % 10 == 0:
+            print(f"Game {t+1} of {n_games}")   
        
         B.reset()
+        last_to_move = None
 
         n = 0
         # make 2 random moves first
         legal_moves = B.allLegalMoves(B.toMove)
-        move = random_player.choose_move(legal_moves)
+        move = starter.choose_move(legal_moves)
         B.makeMove(move)
         legal_moves = B.allLegalMoves(B.toMove)
-        move = random_player.choose_move(legal_moves)
+        move = starter.choose_move(legal_moves)
         B.makeMove(move)
+        last_to_move = None
         n = 1
         while(B.game_over == False):
             n += 1

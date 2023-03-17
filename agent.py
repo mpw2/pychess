@@ -27,7 +27,7 @@ class Agent:
         n_layers = self.config.n_layers
         layers_size = self.config.layers_size
 
-        input_size = BOARD_SIZE * BOARD_SIZE + 1
+        input_size = BOARD_SIZE * BOARD_SIZE * NUM_PIECES + 1
 
         network = nn.Sequential()
         prev_size = input_size
@@ -72,13 +72,15 @@ class Agent:
             print("Load successful!")
 
 
-    def evaluate_moves(self,moves,network):
+    def evaluate_moves(self,B,moves,network):
         evals = np.zeros(np.size(moves))
         for i in range(np.size(moves)):
-            B_next = board.Board(self.env)
+            B_next = board.Board(B)
             B_next.makeMove(moves[i])
-            turn = (self.env.toMove+1)%2
+            turn = (B.toMove+1)%2
             evals[i] = self.evaluate(B_next,turn,network)
+        material_gains = self.calculate_rewards(moves,B)
+        evals += material_gains
         return evals
 
     def evaluate(self,B,turn,network):
@@ -90,18 +92,22 @@ class Agent:
             val = self.target_network(np2torch(state))
         return val
 
-    def calculate_rewards(self,moves):
+    def calculate_rewards(self,moves,B=None):
+        if B is None:
+            B = self.env
         rewards = np.zeros(np.size(moves))
         for i in range(np.size(moves)):
-            rewards[i] = self.calculate_reward(move)
+            rewards[i] = self.calculate_reward(moves[i],B=B)
         return rewards
 
-    def calculate_reward(self,move):
+    def calculate_reward(self,move,B=None):
         """
         computes the material advantage before and after making the move
         """
         out = 0
-        B_next = board.Board(self.env)
+        if B is None:
+            B = self.env
+        B_next = board.Board(B)
         B_next.makeMove(move)
         for i in range(BOARD_SIZE):
             for j in range(BOARD_SIZE):
@@ -115,23 +121,23 @@ class Agent:
                     factor = -1.0
                 val = PIECE_VALUE[(self.env.squares[i][j]+1)//2]
                 out -= val * factor
-        if self.env.toMove == BLACK:
-            out = -1.0*out
         return out
 
     def choose_move(self,moves):
 
-        vals = self.evaluate_moves(moves,"q_network")
+        vals = self.evaluate_moves(self.env,moves,"q_network")
         if self.env.toMove == BLACK:
             vals = -1.0*vals # Black wants to minimize
         best_move = moves[np.argmax(vals)]
         return best_move
 
-    def get_q_values(self, state, network):
+    def get_q_values(self, state, color, network):
         """
         Args:
             state: (list)
                 list of boards with len(state) = batch_size
+            color: (list)
+                list of colors that we are evaluating for
             network: (str)
                 name of the network we want to use for the forward pass,
                 either "q_network" or "target_network"
@@ -143,10 +149,13 @@ class Agent:
 
         out = []
         
-        for s in state:
+        for s,c in zip(state,color):
             moves = s.allLegalMoves(s.toMove)
-            q_vals = torch.tensor(self.evaluate_moves(moves,network))
-            if s.toMove == BLACK:
+            move_evals = self.evaluate_moves(s,moves,network)
+            if move_evals.size == 0:
+                move_evals = np.zeros(1) # would terminate prior so give zero value
+            q_vals = torch.tensor(move_evals)
+            if c == BLACK:
                 q_vals = q_vals * -1.0
             out.append(q_vals)
 
@@ -165,8 +174,8 @@ class Agent:
             ):
 
         gamma = self.config.gamma
-       
-        q_targets = gamma * torch.tensor([torch.max(qt) for qt in target_q_values])
+      
+        q_targets = gamma * torch.tensor([torch.min(qt) for qt in target_q_values])
         q_targets = rewards + torch.bitwise_not(done_mask).to(torch.float32) * q_targets
         tmp = [qv.size(0) <= at for qv,at in zip(q_values,actions)]
         if any(tmp) == True:
@@ -201,8 +210,9 @@ class Agent:
         s_batch, sp_batch, a_batch, r_batch, done_mask_batch = replay_buffer.sample(self.config.batch_size)
         done_mask_batch = done_mask_batch.bool()
         self.optimizer.zero_grad()
-        q_values = self.get_q_values(s_batch, "q_network")
-        target_q_values = self.get_q_values(sp_batch, "target_network")
+        color = [s.toMove for s in s_batch]
+        q_values = self.get_q_values(s_batch, color, "q_network")
+        target_q_values = self.get_q_values(sp_batch, color, "target_network")
         loss = self.calc_loss(q_values, target_q_values,
                 a_batch, r_batch, done_mask_batch)
         loss.backward()
@@ -250,6 +260,8 @@ class Agent:
                 # perform action in env
                 state = board.Board(self.env)
                 reward = self.calculate_reward(move)
+                if self.env.toMove == BLACK: # need to negate reward for black
+                    reward *= -1.0
                 self.env.makeMove(move)
                 done = self.env.game_over
                 new_state = board.Board(self.env)
@@ -328,14 +340,28 @@ def np2torch(x, cast_double_to_float=True):
 
 def main():
     B = board.Board()
-    # make some moves first
-    B.makeMove("e2e4")
-    B.makeMove("d7d5")
 
     engine = Agent(B,config.config_simpleagent())
+
+    legal_moves = B.allLegalMoves(B.toMove)
+    values = engine.evaluate_moves(B,legal_moves,"q_network")
+    zipped = zip(legal_moves, values)
+    for m,v in sorted(zipped, key=lambda x: x[1], reverse=True):
+        print(f"eval({m}) = {v}")
+
+    # make some moves first
+    B.makeMove("d2d4")
+    B.makeMove("e7e5")
+
     print(B)
-    reward = engine.calculate_reward("e4xd5")
-    print(f"reward(e4xd5) = {reward}")
+    reward = engine.calculate_reward("d4xe5")
+    print(f"reward(d4xe5) = {reward}")
+
+    legal_moves = B.allLegalMoves(B.toMove)
+    values = engine.evaluate_moves(B,legal_moves,"q_network")
+    zipped = zip(legal_moves, values)
+    for m,v in sorted(zipped, key=lambda x: x[1], reverse=True):
+        print(f"eval({m}) = {v}")
 
 if __name__ == "__main__":
     main()

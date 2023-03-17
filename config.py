@@ -1,9 +1,11 @@
 import torch.nn as nn
 
+from constants import *
+
 class config_simpleagent:
-    def __init__(self):
-        self.env_name = "SimpleAgent_max"
-        self.training_iteration = 1
+    def __init__(self,train_iter=None):
+        self.env_name = "SimpleAgent_v2"
+        self.training_iteration = 7
         self.record = False
         self.output_path = "results/{}-{}/".format(
             self.env_name, self.training_iteration
@@ -16,27 +18,32 @@ class config_simpleagent:
         self.record_freq = 5
         self.summary_freq = 1
 
-        #self.load_path = "results/SimpleAgent_max-1/model.weights"
+        self.load_path = "results/SimpleAgent_v2-6/model.weights"
+        if not train_iter is None:
+            self.load_path = "results/SimpleAgent_v2-{}/model.weights".format(
+                train_iter
+            )
+            self.training_iteration = train_iter + 1
         
         # model and training config
         self.saving_freq = 1000
-        self.num_episodes = 1000 # number of episodes
+        self.num_episodes = 500 # number of episodes
         self.batch_size = 32 # number of moves in a batch
-        self.buffer_size = 500 # number of moves in the replay buffer
-        self.target_update_freq = 500
+        self.buffer_size = 1000 # number of moves in the replay buffer
+        self.target_update_freq = 1000
         self.max_ep_len = 200 # maximum episode length
         self.learning_rate = 3e-2
         self.gamma = 1.0 # the discount factor
         self.learning_freq = 4
         self.learning_start = 200
 
-        self.eps_begin = 0.20
+        self.eps_begin = 0.02
         self.eps_end = 0.01
         self.eps_nsteps = 10000
         
         # paramters for the value function model
-        self.n_layers = 3
-        self.layers_size = [64, 64, 64]
+        self.n_layers = 2
+        self.layers_size = [64*NUM_PIECES, 64]
 
         # hyperparamters
 

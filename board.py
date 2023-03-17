@@ -317,12 +317,17 @@ class Board:
         return (rnk,fil)
 
     def flatten(self):
-        state = np.zeros(BOARD_SIZE*BOARD_SIZE)
+        state = np.zeros(BOARD_SIZE*BOARD_SIZE*NUM_PIECES)
         cnt = 0
         for i in range(BOARD_SIZE):
             for j in range(BOARD_SIZE):
-                state[cnt] = self.squares[i][j]
-                cnt += 1
+                sval = self.squares[i][j]
+                idx = sval-1 # index 0 to NUM_PIECES-1
+                this_square = np.zeros(NUM_PIECES)
+                if idx >= 0:
+                    this_square[idx] = 1.0
+                state[cnt:cnt+NUM_PIECES] = this_square
+                cnt += NUM_PIECES
         return state
 
     def __str__(self):
