@@ -19,14 +19,14 @@ def main():
 
     engine = Agent(B,config.config_simpleagent())
 
-    legal_moves = B.allLegalMoves(B.toMove)
-    move = starter.choose_move(legal_moves)
-    B.makeMove(move)
-    legal_moves = B.allLegalMoves(B.toMove)
-    move = starter.choose_move(legal_moves)
-    B.makeMove(move)
+    #legal_moves = B.allLegalMoves(B.toMove)
+    #move = starter.choose_move(legal_moves)
+    #B.makeMove(move)
+    #legal_moves = B.allLegalMoves(B.toMove)
+    #move = starter.choose_move(legal_moves)
+    #B.makeMove(move)
 
-    n = 1
+    n = 0
     last_to_move = BLACK
     while(B.game_over == False):
         n += 1

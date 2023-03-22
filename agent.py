@@ -51,6 +51,7 @@ class Agent:
 
         self.optimizer = torch.optim.Adam(self.q_network.parameters())
         self.memory = ReplayBuffer(self.config.buffer_size)
+        #self.capture_memory = ReplayBuffer(self.config.buffer_size)
 
         # exploration strategy
         self.exp_schedule = LinearExploration(
@@ -73,14 +74,14 @@ class Agent:
 
 
     def evaluate_moves(self,B,moves,network):
-        evals = np.zeros(np.size(moves))
+        evals = torch.zeros(len(moves))
         for i in range(np.size(moves)):
             B_next = board.Board(B)
             B_next.makeMove(moves[i])
             turn = (B.toMove+1)%2
             evals[i] = self.evaluate(B_next,turn,network)
         material_gains = self.calculate_rewards(moves,B)
-        evals += material_gains
+        evals += np2torch(material_gains)
         return evals
 
     def evaluate(self,B,turn,network):
@@ -124,11 +125,25 @@ class Agent:
         return out
 
     def choose_move(self,moves):
+        # factor = 1.0
+        # if self.env.toMove == BLACK:
+        #     factor = -1.0
+
+        # rewards = self.calculate_rewards(moves)
+        # rewards *= factor
+        # vals = np.zeros(len(moves))
+        # for i,m in enumerate(moves):
+        #     B_next = board.Board(self.env)
+        #     B_next.makeMove(m)
+        #     next_moves = B_next.allLegalMoves(B_next.toMove)
+        #     next_vals = self.evaluate_moves(B_next,next_moves,"q_network")
+        #     next_vals *= factor
+        #     vals[i] = rewards[i] + np.min(next_vals)
 
         vals = self.evaluate_moves(self.env,moves,"q_network")
         if self.env.toMove == BLACK:
             vals = -1.0*vals # Black wants to minimize
-        best_move = moves[np.argmax(vals)]
+        best_move = moves[torch.argmax(vals)]
         return best_move
 
     def get_q_values(self, state, color, network):
@@ -152,11 +167,11 @@ class Agent:
         for s,c in zip(state,color):
             moves = s.allLegalMoves(s.toMove)
             move_evals = self.evaluate_moves(s,moves,network)
-            if move_evals.size == 0:
-                move_evals = np.zeros(1) # would terminate prior so give zero value
-            q_vals = torch.tensor(move_evals)
+            if move_evals.numel() == 0:
+                move_evals = torch.zeros(1) # would terminate prior so give zero value
+            q_vals = move_evals
             if c == BLACK:
-                q_vals = q_vals * -1.0
+                q_vals *= -1.0
             out.append(q_vals)
 
         return out
@@ -174,16 +189,19 @@ class Agent:
             ):
 
         gamma = self.config.gamma
-      
+
+        tmp = [qt.numel() for qt in target_q_values]
+        if not all(tmp):
+            for i in range(len(target_q_values)):
+                if tmp[i] == 0:
+                    target_q_values[i] = torch.zeros(1)
+
         q_targets = gamma * torch.tensor([torch.min(qt) for qt in target_q_values])
         q_targets = rewards + torch.bitwise_not(done_mask).to(torch.float32) * q_targets
-        tmp = [qv.size(0) <= at for qv,at in zip(q_values,actions)]
-        if any(tmp) == True:
-            print([qv.size(0) for qv in q_values])
-            print(actions)
-        q_samples = torch.tensor([torch.index_select(qv,0,at) for qv,at in zip(q_values,actions)])
+
+        q_samples = [torch.index_select(qv,0,at) for qv,at in zip(q_values,actions)]
+        q_samples = torch.cat(q_samples)
         result = F.mse_loss(q_samples,q_targets)
-        result.requires_grad = True
         return result
     
     # def build(self):
@@ -208,20 +226,27 @@ class Agent:
 
     def update_step(self, t, replay_buffer, lr):
         s_batch, sp_batch, a_batch, r_batch, done_mask_batch = replay_buffer.sample(self.config.batch_size)
+        
         done_mask_batch = done_mask_batch.bool()
         self.optimizer.zero_grad()
         color = [s.toMove for s in s_batch]
         q_values = self.get_q_values(s_batch, color, "q_network")
-        target_q_values = self.get_q_values(sp_batch, color, "target_network")
+        with torch.no_grad():
+            target_q_values = self.get_q_values(sp_batch, color, "target_network")
         loss = self.calc_loss(q_values, target_q_values,
                 a_batch, r_batch, done_mask_batch)
         loss.backward()
         
+        if self.config.grad_clip:
+            total_norm = torch.nn.utils.clip_grad_norm_(
+                self.q_network.parameters(), self.config.clip_val
+            ).item()
+        else:
+            total_norm = 0
+        
         for group in self.optimizer.param_groups:
             group["lr"] = lr
         self.optimizer.step()
-
-        total_norm = 0
 
         return loss.item(), total_norm
 
@@ -232,6 +257,7 @@ class Agent:
     def train(self):
        
         rewards = deque(maxlen=self.config.num_episodes)
+        losses = deque(maxlen=self.config.num_episodes)
 
         t = 0
         episode = 0
@@ -239,9 +265,15 @@ class Agent:
         while episode < self.config.num_episodes:
             episode += 1
             total_reward = 0
+            total_loss = 0
             self.env.reset()
 
-            m = 0
+            legal_moves = self.env.allLegalMoves(self.env.toMove)
+            self.env.makeMove(random.choice(legal_moves))
+            legal_moves = self.env.allLegalMoves(self.env.toMove)
+            self.env.makeMove(random.choice(legal_moves))
+
+            m = 2
 
             print(f"episode = {episode}, t = {t}")
             
@@ -262,15 +294,10 @@ class Agent:
                 reward = self.calculate_reward(move)
                 if self.env.toMove == BLACK: # need to negate reward for black
                     reward *= -1.0
-                self.env.makeMove(move)
+                self.env.makeMove(move) # make the move
                 done = self.env.game_over
                 new_state = board.Board(self.env)
                 action = legal_moves.index(move)
-
-                if action >= len(legal_moves):
-                    print("action >= len(legal_moves)")
-                    print(move)
-                    print(legal_moves)
 
                 # store the transition
                 self.memory.add(
@@ -281,16 +308,33 @@ class Agent:
                     torch.Tensor([done]).float(),
                 )
 
+                # # if there was a reward
+                # if reward != 0:
+                #     self.memory.add(
+                #         state,
+                #         new_state,
+                #         torch.Tensor([action]).long(),
+                #         torch.Tensor([reward]).float(),
+                #         torch.Tensor([done]).float(),
+                #     )
+
                 # perform a training step
-                self.train_step(
+                loss_eval, grad_eval = self.train_step(
                     t, self.memory, self.config.learning_rate
                 )
+                total_loss += loss_eval
 
                 # count reward
                 total_reward += reward
 
             # updates to perform at the end of an episode
             rewards.append(total_reward)
+            with open(self.config.output_path + "rewards.pkl", "wb") as f:
+                pickle.dump(rewards, f)
+
+            losses.append(total_loss / episode)
+            with open(self.config.output_path + "losses.pkl", "wb") as f:
+                pickle.dump(losses, f)
 
             print(self.env)
 
@@ -308,6 +352,7 @@ class Agent:
         # perform training step
         if t > self.config.learning_start and t % self.config.learning_freq == 0:
             loss_eval, grad_eval = self.update_step(t, replay_buffer, lr)
+            print(f"loss = {loss_eval}    grad = {grad_eval}")
 
         # occasionally update target network with q network
         if t % self.config.target_update_freq == 0:
@@ -350,12 +395,18 @@ def main():
         print(f"eval({m}) = {v}")
 
     # make some moves first
-    B.makeMove("d2d4")
-    B.makeMove("e7e5")
+    #B.makeMove("d2d4")
+    #B.makeMove("e7e5")
+
+    #print(B)
+    #reward = engine.calculate_reward("d4xe5")
+    #print(f"reward(d4xe5) = {reward}")
+    
+    B.makeMove("e2e4")
+    B.makeMove("d7d5")
+    #B.makeMove("e4xd5")
 
     print(B)
-    reward = engine.calculate_reward("d4xe5")
-    print(f"reward(d4xe5) = {reward}")
 
     legal_moves = B.allLegalMoves(B.toMove)
     values = engine.evaluate_moves(B,legal_moves,"q_network")

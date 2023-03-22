@@ -11,12 +11,13 @@ def main():
 
     starter = RandomAgent(B)
 
-    random_player = RandomAgent(B)
-    #random_player = Agent(B,config.config_simpleagent(train_iter=5))
+    #random_player = RandomAgent(B)
+    #random_player = Agent(B,config.config_simpleagent())
+    random_player = Agent(B,config.config_simpleagent(train_iter=5))
 
     engine = Agent(B,config.config_simpleagent())
 
-    n_games = 100
+    n_games = 400
     win_record = [0,0,0]
     max_moves = 100
    
