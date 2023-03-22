@@ -55,7 +55,7 @@ class config_simpleagent_v2:
 class config_simpleagent:
     def __init__(self,train_iter=None):
         self.env_name = "SimpleAgent_v3"
-        self.training_iteration = 2
+        self.training_iteration = 4
         self.record = False
         self.output_path = "results/{}-{}/".format(
             self.env_name, self.training_iteration
@@ -68,7 +68,7 @@ class config_simpleagent:
         self.record_freq = 5
         self.summary_freq = 1
 
-        self.load_path = "results/SimpleAgent_v3-1/model.weights"
+        self.load_path = "results/SimpleAgent_v3-3/model.weights"
         if not train_iter is None:
             self.load_path = "results/SimpleAgent_v3-{}/model.weights".format(
                 train_iter
@@ -77,7 +77,7 @@ class config_simpleagent:
         
         # model and training config
         self.saving_freq = 1000
-        self.num_episodes = 2000 # number of episodes
+        self.num_episodes = 1000 # number of episodes
         self.batch_size = 32 # number of moves in a batch
         self.buffer_size = 1000 # number of moves in the replay buffer
         self.target_update_freq = 1000
@@ -92,7 +92,7 @@ class config_simpleagent:
         self.grad_clip = True
         self.clip_val = 100
 
-        self.eps_begin = 0.05
+        self.eps_begin = 0.02
         self.eps_end = 0.01
         self.eps_nsteps = 10000
         
